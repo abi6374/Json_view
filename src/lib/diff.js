@@ -87,28 +87,46 @@ function diffArrays(oldArr, newArr, key) {
 
   oldArr.forEach((item, idx) => {
     const id = resolveItemId(item, idx);
-    oldMap.set(id, { item, idx });
+    oldMap.set(id, { item, idx, id });
   });
 
   newArr.forEach((item, idx) => {
     const id = resolveItemId(item, idx);
-    newMap.set(id, { item, idx });
+    newMap.set(id, { item, idx, id });
   });
 
-  const allIds = new Set([...oldMap.keys(), ...newMap.keys()]);
   const children = [];
+  const unmatchedOld = [];
+  const unmatchedNew = [];
 
-  for (const id of allIds) {
-    const inOld = oldMap.has(id);
-    const inNew = newMap.has(id);
-
-    if (!inOld) {
-      children.push({ type: 'added', key: id, oldValue: undefined, newValue: newMap.get(id).item, children: [] });
-    } else if (!inNew) {
-      children.push({ type: 'removed', key: id, oldValue: oldMap.get(id).item, newValue: undefined, children: [] });
+  // 1. Exact matches
+  for (const oldItem of oldMap.values()) {
+    if (newMap.has(oldItem.id)) {
+      const newItem = newMap.get(oldItem.id);
+      children.push(diffValues(oldItem.item, newItem.item, oldItem.id));
     } else {
-      const result = diffValues(oldMap.get(id).item, newMap.get(id).item, id);
-      children.push(result);
+      unmatchedOld.push(oldItem);
+    }
+  }
+
+  for (const newItem of newMap.values()) {
+    if (!oldMap.has(newItem.id)) {
+      unmatchedNew.push(newItem);
+    }
+  }
+
+  // 2. Pair up unmatched items (index fallback) so they render side-by-side
+  const maxUnmatched = Math.max(unmatchedOld.length, unmatchedNew.length);
+  for (let i = 0; i < maxUnmatched; i++) {
+    const oldU = unmatchedOld[i];
+    const newU = unmatchedNew[i];
+
+    if (oldU && newU) {
+      children.push(diffValues(oldU.item, newU.item, newU.id));
+    } else if (oldU) {
+      children.push({ type: 'removed', key: oldU.id, oldValue: oldU.item, newValue: undefined, children: [] });
+    } else if (newU) {
+      children.push({ type: 'added', key: newU.id, oldValue: undefined, newValue: newU.item, children: [] });
     }
   }
 
