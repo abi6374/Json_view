@@ -74,7 +74,7 @@ function TopbarUpload({ onUploadComplete }) {
 }
 
 // ── Run selector dropdown ─────────────────────────────────────────────────────
-function RunSelector({ runs, activeRunId, onSelectRun }) {
+function RunSelector({ runs, activeRunId, onSelectRun, onDeleteRun }) {
   if (runs.length === 0) return null;
   return (
     <div className="run-selector-wrap">
@@ -93,12 +93,26 @@ function RunSelector({ runs, activeRunId, onSelectRun }) {
           <option key={r.id} value={r.id}>{r.name}</option>
         ))}
       </select>
+      <button
+        className="btn btn-ghost btn-icon"
+        style={{ width: 26, height: 26, padding: 0, color: 'var(--text-muted)' }}
+        onClick={() => {
+          if (confirm('Delete this entire run and all its versions?')) {
+            onDeleteRun(activeRunId);
+          }
+        }}
+        title="Delete run"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        </svg>
+      </button>
     </div>
   );
 }
 
 // ── Version chips strip ───────────────────────────────────────────────────────
-function VersionStrip({ run, activeVersionNum, onVersionChange }) {
+function VersionStrip({ run, activeVersionNum, onVersionChange, onDeleteVersion }) {
   if (!run || run.versions.length === 0) return null;
   const sorted = [...run.versions].sort((a, b) => a.versionNumber - b.versionNumber);
   const activeIndex = sorted.findIndex(v => v.versionNumber === activeVersionNum);
@@ -143,6 +157,22 @@ function VersionStrip({ run, activeVersionNum, onVersionChange }) {
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+      {/* Delete Version */}
+      <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px' }} />
+      <button
+        className="btn btn-ghost btn-icon"
+        style={{ width: 26, height: 26, padding: 0, color: 'var(--text-muted)' }}
+        onClick={() => {
+          if (confirm(`Delete version v${activeVersionNum}?`)) {
+            onDeleteVersion(run.id, activeVersionNum);
+          }
+        }}
+        title="Delete active version"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
         </svg>
       </button>
     </div>
@@ -287,6 +317,35 @@ export default function App() {
     setDiffMode(false);
   }
 
+  function handleDeleteRun(runId) {
+    storage.deleteRun(runId);
+    const fresh = storage.listRuns();
+    setRuns(fresh);
+    if (fresh.length > 0) {
+      handleSelectRun(fresh[0]);
+    } else {
+      setActiveRunId(null);
+      setActiveVersionNum(null);
+    }
+  }
+
+  function handleDeleteVersion(runId, vNum) {
+    storage.deleteVersion(runId, vNum);
+    const fresh = storage.listRuns();
+    setRuns(fresh);
+    const run = fresh.find(r => r.id === runId);
+    if (run && run.versions.length > 0) {
+      handleSelectRun(run);
+    } else {
+      if (fresh.length > 0) {
+        handleSelectRun(fresh[0]);
+      } else {
+        setActiveRunId(null);
+        setActiveVersionNum(null);
+      }
+    }
+  }
+
   const stageDiff = diffResult ? getDiffChild(diffResult, activeStage) : null;
 
   const stageContent = () => {
@@ -317,7 +376,7 @@ export default function App() {
         {runs.length > 0 && <>
           <div className="topbar-divider" />
           {/* Run selector */}
-          <RunSelector runs={runs} activeRunId={activeRunId} onSelectRun={handleSelectRun} />
+          <RunSelector runs={runs} activeRunId={activeRunId} onSelectRun={handleSelectRun} onDeleteRun={handleDeleteRun} />
 
           {/* Version strip */}
           {activeRun && <>
@@ -326,6 +385,7 @@ export default function App() {
               run={activeRun}
               activeVersionNum={activeVersionNum}
               onVersionChange={handleVersionChange}
+              onDeleteVersion={handleDeleteVersion}
             />
           </>}
         </>}
